@@ -85,3 +85,15 @@ def test_logout(client):
     token = csrf(client.get("/").text)
     client.post("/logout", data={"csrf": token})
     assert client.get("/", follow_redirects=False).status_code == 303
+
+
+def test_behind_https_proxy_sets_secure_cookie(client, monkeypatch):
+    r = client.post("/auth/token", data={"token": "good"}, follow_redirects=False,
+                    headers={"x-forwarded-proto": "https", "x-forwarded-host": "agent.example.workers.dev"})
+    assert r.status_code == 303
+    assert "secure" in r.headers["set-cookie"].lower()
+
+
+def test_plain_http_cookie_not_secure(client):
+    r = login(client)
+    assert "secure" not in r.headers["set-cookie"].lower()

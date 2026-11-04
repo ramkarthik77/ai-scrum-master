@@ -1,0 +1,10 @@
+.git
+.github
+.venv
+**/__pycache__
+**/node_modules
+deploy
+tests
+examples
+.env
+*.egg-info

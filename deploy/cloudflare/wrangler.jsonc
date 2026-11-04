@@ -1,0 +1,29 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ai-scrum-master",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "observability": { "enabled": true },
+
+  "containers": [
+    {
+      "class_name": "ScrumAgentContainer",
+      "image": "../../Dockerfile",
+      "image_build_context": "../..",
+      "instance_type": "basic",
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "SCRUM_AGENT", "class_name": "ScrumAgentContainer" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ScrumAgentContainer"] }],
+
+  // Non-secret settings. Secrets (ANTHROPIC_API_KEY, OPENAI_API_KEY,
+  // GITHUB_OAUTH_CLIENT_ID, GITHUB_OAUTH_CLIENT_SECRET) are set with
+  // `wrangler secret put` or by the GitHub deploy workflow.
+  "vars": {
+    "ALLOW_TOKEN_LOGIN": "true",
+    "SESSION_TTL_HOURS": "8"
+  }
+}

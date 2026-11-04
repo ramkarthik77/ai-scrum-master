@@ -91,6 +91,37 @@ scrum-agent serve       # http://127.0.0.1:8000
 - Untrusted issue text is escaped, and unsafe links are stripped from the rendered report.
 - Run a single worker, or replace `SessionStore` with Redis to scale out.
 
+## Deploy to Cloudflare (Workers + Containers)
+
+`deploy/cloudflare/` holds a small Worker that runs the web app's Docker image in a Cloudflare Container. Containers require the Workers Paid plan.
+
+**How it runs:**
+- **One instance:** all traffic goes to one container, named `main`, so the in-memory sessions keep working.
+- **Sleep:** the container sleeps after 30 minutes idle. Afterwards, users just sign in again.
+- **URL:** the app works out its own public URL from the request, so you don't need to set `PUBLIC_URL`.
+
+**Deploy from GitHub (recommended).** `.github/workflows/deploy-cloudflare.yml` runs after CI passes on `main`, or when you start it from the Actions tab. Each run:
+1. checks the Cloudflare token;
+2. builds and deploys the Worker and Container;
+3. uploads the app secrets;
+4. smoke-tests `/healthz`, `/login` and the sign-in redirect on the live `*.workers.dev` URL.
+
+Add these repository secrets:
+- **Required:** `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+- **Optional:** `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GH_OAUTH_CLIENT_ID` and `GH_OAUTH_CLIENT_SECRET`.
+
+Without the two Cloudflare secrets, the deploy is skipped with a warning.
+
+**Deploy from your machine** (needs Docker):
+```bash
+cd deploy/cloudflare && npm ci
+npx wrangler login
+npx wrangler secret put ANTHROPIC_API_KEY   # optional, repeat for other secrets
+npm run deploy
+```
+
+**Sign in with GitHub on Cloudflare.** Set the OAuth App's callback URL to `https://ai-scrum-master.<your-subdomain>.workers.dev/auth/callback`.
+
 ## GitHub Action
 
 `.github/workflows/sprint-agent.yml` runs weekdays at 13:07 UTC, and you can also start it manually.

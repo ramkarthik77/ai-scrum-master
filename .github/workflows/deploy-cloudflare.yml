@@ -1,0 +1,122 @@
+name: Deploy to Cloudflare
+
+# Deploys the web app as a Cloudflare Worker + Container (deploy/cloudflare),
+# after CI passes on main (or on a manual run), then smoke-tests the live URL.
+#
+# Required repository secrets (same values as the sitecraft repo work):
+#   CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID
+# Optional secrets, passed to the app:
+#   ANTHROPIC_API_KEY, OPENAI_API_KEY
+#   GH_OAUTH_CLIENT_ID, GH_OAUTH_CLIENT_SECRET  (GitHub forbids secret names starting with GITHUB_)
+# Optional variable: SCRUM_AGENT_MODEL
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-scrum-master-cloudflare
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy and verify
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: deploy/cloudflare
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Check Cloudflare secrets
+        id: check
+        working-directory: .
+        env:
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CF_TOKEN" ] || [ -z "$CF_ACCOUNT" ]; then
+            echo "::warning::Skipping deploy: add CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID repository secrets."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Works for both account-owned and user-owned API tokens.
+          ok=$(curl -fsS -H "Authorization: Bearer $CF_TOKEN" \
+                 "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT/tokens/verify" 2>/dev/null | jq -r '.success // false' || echo false)
+          [ "$ok" = "true" ] || ok=$(curl -fsS -H "Authorization: Bearer $CF_TOKEN" \
+                 "https://api.cloudflare.com/client/v4/user/tokens/verify" 2>/dev/null | jq -r '.success // false' || echo false)
+          if [ "$ok" != "true" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN is invalid or expired."
+            exit 1
+          fi
+          echo "ready=true" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: deploy/cloudflare/package-lock.json
+
+      - name: Install and type-check Worker
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          npm ci
+          npx tsc -p .
+
+      - name: Deploy Worker, Container and secrets
+        id: deploy
+        if: steps.check.outputs.ready == 'true'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GITHUB_OAUTH_CLIENT_ID: ${{ secrets.GH_OAUTH_CLIENT_ID }}
+          GITHUB_OAUTH_CLIENT_SECRET: ${{ secrets.GH_OAUTH_CLIENT_SECRET }}
+          SCRUM_AGENT_MODEL: ${{ vars.SCRUM_AGENT_MODEL }}
+        run: |
+          secrets="$(mktemp -p "$RUNNER_TEMP")"
+          trap 'rm -f "$secrets"' EXIT
+          chmod 600 "$secrets"
+          # JSON (not dotenv) so wrangler doesn't expand $VARs from the environment.
+          jq -n 'env | with_entries(select(
+                   (.key | IN("ANTHROPIC_API_KEY","OPENAI_API_KEY","GITHUB_OAUTH_CLIENT_ID",
+                              "GITHUB_OAUTH_CLIENT_SECRET","SCRUM_AGENT_MODEL"))
+                   and (.value | length > 0)))' > "$secrets"
+          echo "App secrets uploaded: $(jq -r 'keys | join(", ") | if . == "" then "none" else . end' "$secrets")"
+          set -o pipefail
+          npx wrangler deploy --containers-rollout immediate --secrets-file "$secrets" 2>&1 | tee deploy.log
+          url=$(grep -oE 'https://[a-zA-Z0-9.-]+\.workers\.dev' deploy.log | head -1)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Verify live app
+        if: steps.check.outputs.ready == 'true'
+        env:
+          URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          [ -n "$URL" ] || { echo "::error::Could not find the workers.dev URL in deploy output."; exit 1; }
+          # The container cold-starts on first request and a new image takes a few minutes to roll out.
+          for i in $(seq 1 30); do
+            if curl -fsS --max-time 30 "$URL/healthz" | grep -q '"ok":true'; then echo "healthz OK"; break; fi
+            [ "$i" = 30 ] && { echo "::error::$URL/healthz did not become healthy"; exit 1; }
+            sleep 10
+          done
+          curl -fsS "$URL/login" | grep -q "Sign in" && echo "login page OK"
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$URL/")
+          [ "$code" = "303" ] && echo "auth redirect OK" || { echo "::error::expected 303 from /, got $code"; exit 1; }
+          {
+            echo "### Deployed: $URL"
+            echo "- /healthz, /login and the sign-in redirect all passed"
+            echo "- GitHub OAuth App callback URL: \`$URL/auth/callback\`"
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -9,4 +9,4 @@ USER app
 
 EXPOSE 8000
 # Single worker: sessions are held in memory.
-CMD ["uvicorn", "scrum_agent.web.app:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+CMD ["uvicorn", "scrum_agent.web.app:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]

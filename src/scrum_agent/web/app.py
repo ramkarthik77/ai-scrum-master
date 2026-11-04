@@ -2,7 +2,7 @@
 
 Environment:
   GITHUB_OAUTH_CLIENT_ID / GITHUB_OAUTH_CLIENT_SECRET  enable "Sign in with GitHub"
-  PUBLIC_URL               external base URL (for the OAuth callback), default http://127.0.0.1:8000
+  PUBLIC_URL               external base URL (for the OAuth callback); default: derived from the request
   ALLOW_TOKEN_LOGIN        "true" (default) shows the personal-access-token form
   SESSION_TTL_HOURS        default 8
   ANTHROPIC_API_KEY / OPENAI_API_KEY  for the LLM review (otherwise use rules-only)
@@ -122,8 +122,15 @@ def create_app() -> FastAPI:
     store = SessionStore(int(float(os.getenv("SESSION_TTL_HOURS", "8")) * 3600))
     client_id = os.getenv("GITHUB_OAUTH_CLIENT_ID")
     client_secret = os.getenv("GITHUB_OAUTH_CLIENT_SECRET")
-    public_url = os.getenv("PUBLIC_URL", "http://127.0.0.1:8000").rstrip("/")
-    secure_cookie = public_url.startswith("https://")
+    configured_url = (os.getenv("PUBLIC_URL") or "").rstrip("/")
+
+    def public_url(request: Request) -> str:
+        """PUBLIC_URL if set, else derived from the (proxied) request."""
+        if configured_url:
+            return configured_url
+        proto = request.headers.get("x-forwarded-proto") or request.url.scheme
+        host = request.headers.get("x-forwarded-host") or request.headers.get("host") or request.url.netloc
+        return f"{proto}://{host}"
     oauth_enabled = bool(client_id and client_secret)
     token_login = _env_bool("ALLOW_TOKEN_LOGIN", True)
     llm_key_present = bool(os.getenv("ANTHROPIC_API_KEY") or os.getenv("OPENAI_API_KEY"))
@@ -147,11 +154,11 @@ def create_app() -> FastAPI:
             raise HTTPException(404)
         return f"{owner}/{repo}"
 
-    def start_session(token: str) -> RedirectResponse:
+    def start_session(request: Request, token: str) -> RedirectResponse:
         me = create("github", {"token": token, "base_url": api_base}).whoami()
         sid = store.create(Session(token=token, login=me.login, avatar_url=me.avatar_url))
         resp = RedirectResponse("/", status_code=303)
-        resp.set_cookie(COOKIE, sid, httponly=True, samesite="lax", secure=secure_cookie,
+        resp.set_cookie(COOKIE, sid, httponly=True, samesite="lax", secure=public_url(request).startswith("https://"),
                         max_age=store.ttl)
         return resp
 
@@ -165,20 +172,20 @@ def create_app() -> FastAPI:
                     token_login=token_login, error=error)
 
     @app.get("/auth/github")
-    def auth_github():
+    def auth_github(request: Request):
         if not oauth_enabled:
             raise HTTPException(404, "GitHub OAuth is not configured.")
-        url, state = auth.oauth_authorize_url(client_id, f"{public_url}/auth/callback")
+        url, state = auth.oauth_authorize_url(client_id, f"{public_url(request)}/auth/callback")
         store.add_state(state)
         return RedirectResponse(url, status_code=302)
 
     @app.get("/auth/callback")
-    def auth_callback(code: str = "", state: str = "", error: str = ""):
+    def auth_callback(request: Request, code: str = "", state: str = "", error: str = ""):
         if error or not code or not store.pop_state(state):
             return RedirectResponse("/login?error=GitHub+sign-in+was+cancelled+or+expired", 303)
         try:
-            token = auth.oauth_exchange_code(client_id, client_secret, code, f"{public_url}/auth/callback")
-            return start_session(token)
+            token = auth.oauth_exchange_code(client_id, client_secret, code, f"{public_url(request)}/auth/callback")
+            return start_session(request, token)
         except Exception:
             return RedirectResponse("/login?error=Could+not+complete+GitHub+sign-in", 303)
 
@@ -187,7 +194,7 @@ def create_app() -> FastAPI:
         if not token_login:
             raise HTTPException(404)
         try:
-            return start_session(token.strip())
+            return start_session(request, token.strip())
         except Exception:
             return page(request, "login.html", oauth_enabled=oauth_enabled, token_login=token_login,
                         error="GitHub rejected that token. Check it hasn't expired and has the 'repo' scope.",
