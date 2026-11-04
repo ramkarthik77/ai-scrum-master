@@ -84,6 +84,7 @@ def _payload(health: SprintHealth) -> str:
         "blocked": [item(i) for i in health.blocked],
         "over_wip_limit": health.over_wip,
         "by_assignee": health.by_assignee,
+        "board_columns": health.by_status,
     }
     return json.dumps(data, default=str, indent=1)
 

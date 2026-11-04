@@ -54,6 +54,14 @@ def render(
         f"| People over WIP limit | {len(health.over_wip)} |",
         "",
     ]
+    if health.by_status:
+        def _col(name: str) -> str:
+            return name.removeprefix("status: ").replace("-", " ").capitalize()
+        out += ["## Board",
+                "| " + " | ".join(_col(c) for c in health.by_status) + " |",
+                "|" + "---|" * len(health.by_status),
+                "| " + " | ".join(str(n) for n in health.by_status.values()) + " |", ""]
+
     if narrative.strip():
         out += ["## Analysis", narrative.strip(), ""]
 

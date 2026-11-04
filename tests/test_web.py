@@ -97,3 +97,16 @@ def test_behind_https_proxy_sets_secure_cookie(client, monkeypatch):
 def test_plain_http_cookie_not_secure(client):
     r = login(client)
     assert "secure" not in r.headers["set-cookie"].lower()
+
+
+def test_setup_board_preview_and_apply(monkeypatch):
+    from fakes import BoardFakeTracker
+    t = BoardFakeTracker()
+    monkeypatch.setattr(web, "create", lambda name, creds: t)
+    c = TestClient(web.create_app())
+    login(c)
+    r = c.get("/r/o/r/setup")
+    assert "Apply" in r.text and t.label_store == {}
+    r = c.post("/r/o/r/setup", data={"csrf": csrf(r.text)})
+    assert "Done." in r.text and "type: story" in t.label_store
+    assert "Nothing to change" in c.get("/r/o/r/setup").text

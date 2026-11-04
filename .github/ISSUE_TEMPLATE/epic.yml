@@ -1,0 +1,25 @@
+name: Epic
+description: A large outcome split into stories
+title: "[Epic] "
+labels: ["type: epic"]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: What changes for users or the business when this is done?
+    validations:
+      required: true
+  - type: textarea
+    id: stories
+    attributes:
+      label: Stories
+      description: Task list of the stories in this epic. Create them with the User story template.
+      value: |
+        - [ ] #
+    validations:
+      required: true
+  - type: textarea
+    id: success
+    attributes:
+      label: Success measures

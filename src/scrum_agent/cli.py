@@ -157,6 +157,38 @@ def audit(
         raise typer.Exit(1)
 
 
+@app.command("init-board")
+def init_board(
+    repo: RepoArg = None,
+    apply: Annotated[bool, typer.Option("--apply", help="Make the changes. Default lists what would change.")] = False,
+    labels_only: Annotated[bool, typer.Option("--labels-only", help="Only set up labels, no files.")] = False,
+    token: TokenOpt = None,
+):
+    """Set up a repo's GitHub Issues for Scrum: labels, issue forms, PR template, workflow docs.
+
+    Creates missing labels and updates the color/description of matching ones. Adds
+    files only if they don't exist (never overwrites, never deletes).
+    """
+    from .setup_board import plan_and_apply
+
+    rid = _repo(repo)
+    steps = plan_and_apply(_tracker(token), rid, apply=apply, files=not labels_only)
+    icon = {"create": "+", "update": "~", "keep": "=", "skip": "="}
+    for s in steps:
+        note = " (exists, left as is)" if s.action == "skip" else ""
+        status = f"  ERROR {s.error}" if s.error else ""
+        typer.echo(f" {icon[s.action]} {s.kind:<5} {s.name}{note}{status}")
+    changes = [s for s in steps if s.action in ("create", "update")]
+    if not apply:
+        typer.secho(f"\nDry run: {len(changes)} change(s). Re-run with --apply to make them.", fg="yellow")
+    else:
+        failed = [s for s in steps if s.error]
+        typer.secho(f"\nApplied {len(changes) - len(failed)} change(s) to {rid}.",
+                    fg="red" if failed else "green")
+        if failed:
+            raise typer.Exit(1)
+
+
 @app.command()
 def serve(host: str = "127.0.0.1", port: int = 8000, reload: bool = False):
     """Run the web app (GitHub sign-in, repo picker, audits)."""

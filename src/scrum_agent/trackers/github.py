@@ -135,6 +135,30 @@ class GitHubTracker(TrackerProvider):
             parts.append(f"## {path}\n{text}")
         return "\n\n".join(parts)[:RULES_MAX_CHARS]
 
+    def existing_labels(self, project_id: str) -> dict[str, tuple[str, str]]:
+        return {lbl.name: (lbl.color, lbl.description or "") for lbl in self._repo(project_id).get_labels()}
+
+    def upsert_label(self, project_id: str, name: str, color: str, description: str) -> None:
+        repo = self._repo(project_id)
+        try:
+            repo.get_label(name).edit(name, color, description)
+        except GithubException as e:
+            if e.status != 404:
+                raise
+            repo.create_label(name, color, description)
+
+    def file_exists(self, project_id: str, path: str) -> bool:
+        try:
+            self._repo(project_id).get_contents(path)
+            return True
+        except GithubException as e:
+            if e.status == 404:
+                return False
+            raise
+
+    def create_file(self, project_id: str, path: str, content: str, message: str) -> None:
+        self._repo(project_id).create_file(path, message, content)
+
     def read_agent_config(self, project_id: str) -> str:
         try:
             f = self._repo(project_id).get_contents(".github/scrum-agent.yml")

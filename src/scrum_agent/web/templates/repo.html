@@ -2,7 +2,10 @@
 {% block title %}{{ repo }} · AI Scrum Master{% endblock %}
 {% block content %}
 <nav class="crumbs" aria-label="Breadcrumb"><a href="/">Repositories</a> / {{ repo }}</nav>
-<h1>{{ repo }}</h1>
+<div class="actions-bar" style="justify-content:space-between">
+  <h1>{{ repo }}</h1>
+  <a class="btn" href="/r/{{ repo }}/setup">Set up Scrum board</a>
+</div>
 
 {% if not sprints %}
 <div class="alert alert-info" style="margin-top:16px">

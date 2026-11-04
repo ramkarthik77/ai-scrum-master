@@ -1,0 +1,49 @@
+name: User story
+description: User-facing value with acceptance criteria
+title: "[Story] "
+labels: ["type: story"]
+body:
+  - type: textarea
+    id: story
+    attributes:
+      label: Story
+      description: As a <who>, I want <what>, so that <why>.
+      placeholder: As a team lead, I want to see stale issues, so that I can unblock people early.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Observable, testable outcomes. One per line.
+      value: |
+        - [ ] Given ..., when ..., then ...
+        - [ ]
+    validations:
+      required: true
+  - type: textarea
+    id: verify
+    attributes:
+      label: How to verify
+      description: Command, test or manual steps that prove it's done.
+      render: shell
+  - type: input
+    id: epic
+    attributes:
+      label: Epic
+      description: Parent epic issue, e.g. #4 (optional)
+  - type: dropdown
+    id: points
+    attributes:
+      label: Story points (estimate)
+      description: "Add the matching `points: N` label during refinement so the scrum agent can track estimates."
+      options: ["Not estimated", "1", "2", "3", "5", "8", "13"]
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      options: ["Medium", "High", "Low"]
+  - type: textarea
+    id: notes
+    attributes:
+      label: Notes, designs, dependencies

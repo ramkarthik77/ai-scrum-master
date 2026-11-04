@@ -1,0 +1,26 @@
+name: Impediment
+description: Something is blocking the team; raise it to the Scrum Master
+title: "[Impediment] "
+labels: ["type: impediment", "priority: high"]
+body:
+  - type: textarea
+    id: blocker
+    attributes:
+      label: What is blocked, and by what?
+      description: Link the blocked issues (e.g. #12) and add `status: blocked` to them.
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact on the sprint goal
+    validations:
+      required: true
+  - type: input
+    id: owner
+    attributes:
+      label: Who can unblock it?
+  - type: input
+    id: needed_by
+    attributes:
+      label: Needed by (date)

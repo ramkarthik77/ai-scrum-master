@@ -1,0 +1,26 @@
+name: Task or spike
+description: Technical work, chore or time-boxed research
+title: "[Task] "
+labels: ["type: task"]
+body:
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What needs doing and why. For a spike, the question to answer and the time box.
+    validations:
+      required: true
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      value: |
+        - [ ]
+    validations:
+      required: true
+  - type: dropdown
+    id: points
+    attributes:
+      label: Story points (estimate)
+      description: "Add the matching `points: N` label during refinement so the scrum agent can track estimates."
+      options: ["Not estimated", "1", "2", "3", "5", "8", "13"]

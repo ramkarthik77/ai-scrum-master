@@ -109,6 +109,20 @@ class TrackerProvider(ABC):
     def upsert_report(self, project_id: str, sprint: Sprint, body: str) -> str:
         """Publish the sprint report somewhere visible; return its URL."""
 
+    # -- board setup (optional; used by `scrum-agent init-board`) ----------
+    def existing_labels(self, project_id: str) -> dict[str, tuple[str, str]]:
+        """name -> (color, description)."""
+        raise NotImplementedError
+
+    def upsert_label(self, project_id: str, name: str, color: str, description: str) -> None:
+        raise NotImplementedError
+
+    def file_exists(self, project_id: str, path: str) -> bool:
+        raise NotImplementedError
+
+    def create_file(self, project_id: str, path: str, content: str, message: str) -> None:
+        raise NotImplementedError
+
     def read_agent_config(self, project_id: str) -> str:
         """Return the project's agent config YAML (if the tracker stores one), or ''."""
         return ""

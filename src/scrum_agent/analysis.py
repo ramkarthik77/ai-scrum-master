@@ -43,6 +43,7 @@ class SprintHealth:
     missing_estimate: list[WorkItem] = field(default_factory=list)
     blocked: list[WorkItem] = field(default_factory=list)
     over_wip: dict[str, int] = field(default_factory=dict)
+    by_status: dict[str, int] = field(default_factory=dict)
     by_assignee: dict[str, dict[str, int]] = field(default_factory=dict)
 
     @property
@@ -106,7 +107,7 @@ def analyze(
         labels = set(item.labels)
         if not item.assignees:
             health.unassigned.append(item)
-        if not has_estimate(item, cfg.estimate_label_prefixes):
+        if not has_estimate(item, cfg.estimate_label_prefixes) and not labels & set(cfg.no_estimate_labels):
             health.missing_estimate.append(item)
         if labels & set(cfg.blocked_labels):
             health.blocked.append(item)
@@ -129,6 +130,12 @@ def analyze(
             )
 
     health.stale.sort(key=lambda f: -f.hours_idle)
+
+    cols = {"Backlog": 0, **{c: 0 for c in cfg.status_columns}, "Done": len(closed)}
+    for item in open_:
+        col = next((c for c in cfg.status_columns if c in item.labels), "Backlog")
+        cols[col] += 1
+    health.by_status = cols
     health.over_wip = {a: n for a, n in wip.items() if n > cfg.wip_limit_per_person}
 
     per: dict[str, dict[str, int]] = {}

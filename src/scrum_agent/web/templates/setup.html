@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Set up board · {{ repo }}{% endblock %}
+{% block content %}
+{% set labels = steps|selectattr("kind", "equalto", "label")|list %}
+{% set files = steps|selectattr("kind", "equalto", "file")|list %}
+{% set changes = steps|selectattr("action", "in", ["create", "update"])|list %}
+{% set failed = steps|selectattr("error")|list %}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Repositories</a> / <a href="/r/{{ repo }}">{{ repo }}</a> / Set up board</nav>
+<h1>Set up Scrum board</h1>
+<p class="muted">Standard labels, issue templates, a PR template and a workflow guide for GitHub Issues.
+  Existing files are never overwritten and no labels are deleted.</p>
+
+{% if applied %}
+  {% if failed %}
+  <div class="alert alert-error" role="alert">{{ failed|length }} change(s) failed. Your token needs write access to this repo.</div>
+  {% else %}
+  <div class="alert alert-info" role="status">Done. <a href="https://github.com/{{ repo }}/labels" target="_blank" rel="noopener">View labels</a> ·
+    <a href="https://github.com/{{ repo }}/issues/new/choose" target="_blank" rel="noopener">Try the issue templates</a></div>
+  {% endif %}
+{% elif changes %}
+<form method="post" class="actions-bar" style="margin:16px 0">
+  <input type="hidden" name="csrf" value="{{ user.csrf }}">
+  <button class="btn btn-primary" type="submit" data-busy="Setting up…">Apply {{ changes|length }} change{{ "s" if changes|length != 1 }}</button>
+  <a class="btn btn-ghost" href="/r/{{ repo }}">Cancel</a>
+</form>
+{% else %}
+<div class="alert alert-info" style="margin:16px 0">This repository already has everything. Nothing to change.</div>
+{% endif %}
+
+<div class="grid-2">
+  <section class="card report">
+    <h2 style="margin-top:0">Labels</h2>
+    <table>
+      <thead><tr><th>Label</th><th>Change</th></tr></thead>
+      <tbody>
+      {% for s in labels %}
+        <tr><td><code>{{ s.name }}</code></td>
+          <td>{% if s.error %}<span style="color:var(--danger)">Failed</span>{% elif s.action == "keep" %}<span class="muted">Already set</span>{% else %}{{ "Created" if applied and s.action == "create" else "Updated" if applied else s.action|capitalize }}{% endif %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+  <section class="card report">
+    <h2 style="margin-top:0">Files</h2>
+    <table>
+      <thead><tr><th>File</th><th>Change</th></tr></thead>
+      <tbody>
+      {% for s in files %}
+        <tr><td><code>{{ s.name }}</code></td>
+          <td>{% if s.error %}<span style="color:var(--danger)">Failed</span>{% elif s.action == "skip" %}<span class="muted">Exists, kept</span>{% else %}{{ "Added" if applied else "Add" }}{% endif %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </section>
+</div>
+{% endblock %}

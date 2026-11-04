@@ -31,6 +31,7 @@ from fastapi.templating import Jinja2Templates
 from .. import auth
 from ..config import DEFAULT_MODEL
 from ..service import audit
+from ..setup_board import plan_and_apply
 from ..trackers import create
 
 HERE = Path(__file__).parent
@@ -252,6 +253,27 @@ def create_app() -> FastAPI:
         return page(request, "result.html", s, repo=rid, r=r,
                     report_html=render_markdown(report_body(r.report)),
                     form={"sprint": r.sprint.id, "use_llm": use_llm, "post_report": post_report})
+
+    @app.get("/r/{owner}/{repo}/setup", response_class=HTMLResponse)
+    def setup_page(request: Request, owner: str, repo: str):
+        s = session_or_redirect(request)
+        rid = repo_id(owner, repo)
+        try:
+            steps = plan_and_apply(tracker(s), rid, apply=False)
+        except Exception as e:
+            return page(request, "error.html", s, status=400, message=f"Could not read {rid}: {e}", back=f"/r/{rid}")
+        return page(request, "setup.html", s, repo=rid, steps=steps, applied=False)
+
+    @app.post("/r/{owner}/{repo}/setup", response_class=HTMLResponse)
+    def setup_apply(request: Request, owner: str, repo: str, csrf: str = Form("")):
+        s = session_or_redirect(request)
+        check_csrf(s, csrf)
+        rid = repo_id(owner, repo)
+        try:
+            steps = plan_and_apply(tracker(s), rid, apply=True)
+        except Exception as e:
+            return page(request, "error.html", s, status=400, message=str(e), back=f"/r/{rid}")
+        return page(request, "setup.html", s, repo=rid, steps=steps, applied=True)
 
     @app.exception_handler(HTTPException)
     def http_error(request: Request, exc: HTTPException):

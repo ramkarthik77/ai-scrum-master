@@ -58,3 +58,22 @@ class FakeTracker(TrackerProvider):
     def upsert_report(self, project_id, sprint, body):
         self.reports.append(body)
         return "https://github.com/o/r/issues/999"
+
+
+class BoardFakeTracker(FakeTracker):
+    def __init__(self, labels=None, files=None):
+        super().__init__([])
+        self.label_store = dict(labels or {})
+        self.files = dict(files or {})
+
+    def existing_labels(self, project_id):
+        return self.label_store
+
+    def upsert_label(self, project_id, name, color, description):
+        self.label_store[name] = (color, description)
+
+    def file_exists(self, project_id, path):
+        return path in self.files
+
+    def create_file(self, project_id, path, content, message):
+        self.files[path] = content

@@ -27,10 +27,16 @@ class AgentConfig:
     #: "all_open"    = every open issue in the sprint
     stale_scope: str = "in_progress"
     stale_label: str = "status: stale"
-    in_progress_labels: list[str] = field(default_factory=lambda: ["status: in-progress"])
+    in_progress_labels: list[str] = field(default_factory=lambda: ["status: in-progress", "status: in-review"])
     blocked_labels: list[str] = field(default_factory=lambda: ["status: blocked"])
     #: issues with any of these labels are never nudged
     exempt_labels: list[str] = field(default_factory=lambda: ["status: blocked", "on-hold"])
+    #: board columns, in order, for the status breakdown (no label = Backlog)
+    status_columns: list[str] = field(
+        default_factory=lambda: ["status: ready", "status: in-progress", "status: in-review"]
+    )
+    #: issues with these labels are not expected to carry an estimate
+    no_estimate_labels: list[str] = field(default_factory=lambda: ["type: epic"])
     estimate_label_prefixes: list[str] = field(
         default_factory=lambda: ["points:", "size:", "estimate:", "sp:"]
     )

@@ -1,0 +1,37 @@
+name: Bug
+description: Something is broken
+title: "[Bug] "
+labels: ["type: bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options: ["Major: feature unusable", "Minor: workaround exists", "Critical: data loss or outage"]
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment and logs
+      render: shell
