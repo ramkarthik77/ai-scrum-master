@@ -1,0 +1,19 @@
+# Optional per-repo config. Copy to .github/scrum-agent.yml in the audited repo.
+# Every key is optional; these are the defaults.
+
+stale_hours: 48
+# in_progress: open issues that are assigned or labelled in-progress
+# all_open:    every open issue in the sprint
+stale_scope: in_progress
+stale_label: "status: stale"
+in_progress_labels: ["status: in-progress"]
+blocked_labels: ["status: blocked"]
+exempt_labels: ["status: blocked", "on-hold"]   # never nudged
+estimate_label_prefixes: ["points:", "size:", "estimate:", "sp:"]
+wip_limit_per_person: 3
+
+llm_model: "anthropic:claude-sonnet-5-5"  # or "openai:gpt-4o"
+llm_enabled: true
+llm_temperature: 0.0
+
+post_report: false   # with --apply, keep a "Sprint report: <milestone>" issue updated

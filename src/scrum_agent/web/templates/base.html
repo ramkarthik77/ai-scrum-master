@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}AI Scrum Master{% endblock %}</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="topbar">
+    <a class="brand" href="/">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+      AI Scrum Master
+    </a>
+    {% if user %}
+    <div class="user">
+      {% if user.avatar_url %}<img src="{{ user.avatar_url }}" alt="">{% endif %}
+      <span>{{ user.login }}</span>
+      <form method="post" action="/logout">
+        <input type="hidden" name="csrf" value="{{ user.csrf }}">
+        <button class="btn btn-ghost" type="submit">Sign out</button>
+      </form>
+    </div>
+    {% endif %}
+  </header>
+  <main id="main">{% block content %}{% endblock %}</main>
+  <script>
+    // Busy state for long-running submits (audits can take ~30s with an LLM)
+    document.addEventListener('submit', (e) => {
+      const b = e.target.querySelector('button[data-busy]');
+      if (b) { b.setAttribute('aria-busy', 'true'); b.textContent = b.dataset.busy; b.disabled = true; }
+    });
+  </script>
+</body>
+</html>

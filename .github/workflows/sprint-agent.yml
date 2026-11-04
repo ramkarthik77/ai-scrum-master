@@ -1,0 +1,86 @@
+name: Sprint agent
+
+# Daily sprint audit. Dry run by default; set the repository variable
+# SCRUM_AGENT_APPLY=true (or tick "apply" on a manual run) to label/comment.
+#
+# Repositories to audit:
+#   - default: this repository
+#   - or set the variable SCRUM_AGENT_REPOS to a JSON list, e.g. ["acme/web","acme/api"]
+#     and add a SCRUM_AGENT_TOKEN secret (PAT with Issues read/write on those repos).
+#
+# Secrets: ANTHROPIC_API_KEY (default model) or OPENAI_API_KEY (+ SCRUM_AGENT_MODEL=openai:gpt-4o).
+# Without an LLM key the audit still runs in rules-only mode.
+
+on:
+  schedule:
+    - cron: "7 13 * * 1-5" # weekdays 13:07 UTC
+  workflow_dispatch:
+    inputs:
+      repo:
+        description: "owner/repo to audit (blank = configured list)"
+        required: false
+      sprint:
+        description: "Milestone title or number (blank = nearest due open milestone)"
+        required: false
+      apply:
+        description: "Apply labels/comments (otherwise dry run)"
+        type: boolean
+        default: false
+      post_report:
+        description: "Create/update a 'Sprint report' issue (needs apply)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: sprint-agent
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        repo: ${{ fromJSON(inputs.repo && format('["{0}"]', inputs.repo) || vars.SCRUM_AGENT_REPOS || format('["{0}"]', github.repository)) }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install ".[openai]"
+
+      - name: Audit ${{ matrix.repo }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.SCRUM_AGENT_TOKEN || secrets.GITHUB_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SCRUM_AGENT_MODEL: ${{ vars.SCRUM_AGENT_MODEL }}
+          APPLY: ${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.apply) || vars.SCRUM_AGENT_APPLY == 'true' }}
+          POST_REPORT: ${{ github.event_name == 'workflow_dispatch' && format('{0}', inputs.post_report) || vars.SCRUM_AGENT_POST_REPORT == 'true' }}
+          SPRINT: ${{ inputs.sprint }}
+          REPO: ${{ matrix.repo }}
+        run: |
+          args=("$REPO" --output report.md)
+          [ -n "$SPRINT" ] && args+=(--sprint "$SPRINT")
+          [ "$APPLY" = "true" ] && args+=(--apply)
+          [ "$POST_REPORT" = "true" ] && args+=(--post-report)
+          if [ -z "$ANTHROPIC_API_KEY$OPENAI_API_KEY" ]; then
+            echo "::notice::No LLM key configured; running rules-only."
+            args+=(--no-llm)
+          fi
+          scrum-agent audit "${args[@]}"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sprint-report-${{ strategy.job-index }}
+          path: report.md
+          if-no-files-found: ignore

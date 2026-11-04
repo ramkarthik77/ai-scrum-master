@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Repositories</h1>
+<p class="muted">Pick a repository. Its open milestones are treated as sprints.</p>
+<div class="stack">
+  <div>
+    <label for="filter">Filter</label>
+    <input id="filter" type="search" placeholder="owner/repo" autocomplete="off">
+  </div>
+  {% if projects %}
+  <ul class="repo-list" id="repos">
+    {% for p in projects %}
+    <li data-name="{{ p.id|lower }}">
+      <a href="/r/{{ p.id }}">
+        <span><span class="repo-name">{{ p.id }}</span>
+          {% if p.description %}<br><span class="small muted">{{ p.description|truncate(90) }}</span>{% endif %}</span>
+        <span>
+          {% if p.private %}<span class="tag">private</span>{% endif %}
+          <span class="tag">{{ "read/write" if p.can_write else "read only" }}</span>
+        </span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+  <p id="empty" class="muted" hidden>No repositories match.</p>
+  {% else %}
+  <div class="alert alert-info">This account can't see any repositories. Check the token's scopes or organization access.</div>
+  {% endif %}
+</div>
+<script>
+  const f = document.getElementById('filter'), rows = [...document.querySelectorAll('#repos li')];
+  f && f.addEventListener('input', () => {
+    const q = f.value.trim().toLowerCase(); let shown = 0;
+    rows.forEach(r => { const m = r.dataset.name.includes(q); r.hidden = !m; shown += m; });
+    document.getElementById('empty').hidden = shown > 0;
+  });
+</script>
+{% endblock %}

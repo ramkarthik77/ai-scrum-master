@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}{{ repo }} · AI Scrum Master{% endblock %}
+{% block content %}
+<nav class="crumbs" aria-label="Breadcrumb"><a href="/">Repositories</a> / {{ repo }}</nav>
+<h1>{{ repo }}</h1>
+
+{% if not sprints %}
+<div class="alert alert-info" style="margin-top:16px">
+  No open milestones yet. <a href="https://github.com/{{ repo }}/milestones/new" target="_blank" rel="noopener">Create a milestone</a>
+  to act as a sprint, add issues to it, then come back.
+</div>
+{% else %}
+<form method="post" action="/r/{{ repo }}/audit" class="card stack" style="margin-top:16px">
+  <input type="hidden" name="csrf" value="{{ user.csrf }}">
+  <div>
+    <label for="sprint">Sprint (milestone)</label>
+    <select id="sprint" name="sprint">
+      {% for s in sprints %}
+      <option value="{{ s.id }}" {% if active and s.id == active.id %}selected{% endif %}>
+        {{ s.title }}{% if s.due_on %} · due {{ s.due_on.date() }}{% endif %}
+      </option>
+      {% endfor %}
+    </select>
+    <p class="help">Defaults to the open milestone with the nearest due date.</p>
+  </div>
+
+  <label class="check">
+    <input type="checkbox" name="use_llm" {% if llm_available %}checked{% else %}disabled{% endif %}>
+    <span><strong>AI analysis</strong>
+      <span class="small muted">{% if llm_available %}Narrative report and tailored nudges using {{ model }}.{% else %}Unavailable: the server has no ANTHROPIC_API_KEY or OPENAI_API_KEY. Rules-only audit will run.{% endif %}</span></span>
+  </label>
+
+  <label class="check danger">
+    <input type="checkbox" name="apply">
+    <span><strong>Apply actions on GitHub</strong>
+      <span class="small muted">Label stale issues <code>status: stale</code> and comment asking the assignee for an update. Off = dry run, nothing changes.</span></span>
+  </label>
+
+  <label class="check">
+    <input type="checkbox" name="post_report">
+    <span><strong>Publish report issue</strong>
+      <span class="small muted">With actions applied, create or update a "Sprint report: …" issue.</span></span>
+  </label>
+
+  <div class="actions-bar">
+    <button class="btn btn-primary" type="submit" data-busy="Auditing…">Run audit</button>
+    <a class="btn btn-ghost" href="https://github.com/{{ repo }}/milestones" target="_blank" rel="noopener">View milestones on GitHub</a>
+  </div>
+</form>
+{% endif %}
+{% endblock %}
